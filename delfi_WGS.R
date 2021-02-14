@@ -2,8 +2,10 @@
 # DELFI - DNA EvaLuation of Fragments for early Interception      #
 # Adapted from : https://github.com/cancer-genomics/delfi_scripts #
 # Date - Feb 09 2021                                              #
-# - Input: Bam files from low-coverage (1-2X) WGS                 #
-# - Output: Prediction on whether input WGS comes from tumor      #
+# Params:                                                         #
+#   --bam: A Bam file from low-coverage (1-2X) WGS                #
+#   --out: output prefix                                          #
+# Output: A fragment profile at 100kb bins for the bam            #
 ###################################################################
 
 
@@ -23,7 +25,7 @@ options.names <- sapply(listoptions, function(x) {
 names(options.args) <- unlist(options.names)
 
 usage <- function() {
-	message('Usage: Rscript --vanilla delfi_WGS.R --bam <bam> --out <out>')
+	message('Usage: Rscript --vanilla delfi_WGS.R --bam <bam> --out <out_prefix>')
 }
 if (length(options.names) != 2) {
 	usage()
@@ -96,205 +98,134 @@ param <- ScanBamParam(flag = scanBamFlag(isDuplicate = FALSE,
                       mapqFilter = 30)
 outdir <- '../'
 galp.file <- file.path(outdir, paste0(outprefix, ".rds"))
-#galp <- readGAlignmentPairs(bamfile, param = param)
-#saveRDS(galp, galp.file)
+galp <- readGAlignmentPairs(bamfile, param = param)
+saveRDS(galp, galp.file)
 
 
 ###########################################
-# 3. Get GC content for fragments         #
+# 3. Filter fragments / Get GC content    #
 ###########################################
-#galp <- readRDS(galp.file)
-#frags <- granges(keepSeqlevels(galp, paste0("chr", 1:22), pruning.mode="coarse"),
-#             on.discordant.seqnames="drop")
-#
-### filter outliers
-#w.all <- width(frags)
-#q.all <- quantile(w.all, c(0.001, 0.999))
-#frags <- frags[which(w.all > q.all[1] & w.all < q.all[2])]
-#
-#frags$gc <- GCcontent(Hsapiens, unstrand(frags))
+galp <- readRDS(galp.file)
+frags <- granges(keepSeqlevels(galp, paste0("chr", 1:22), pruning.mode="coarse"),
+             on.discordant.seqnames="drop")
+
+## filter outliers
+w.all <- width(frags)
+q.all <- quantile(w.all, c(0.001, 0.999))
+frags <- frags[which(w.all > q.all[1] & w.all < q.all[2])]
+
+frags$gc <- GCcontent(Hsapiens, unstrand(frags))
 
 frag.file <- file.path(outdir, paste0(outprefix, "_frags.rds"))
-#saveRDS(frags, frag.file)
+saveRDS(frags, frag.file)
 
 
 ###########################################
 # 4. Bin compartments, GC correction      #
 ###########################################
 
-#gc.correct <- function(coverage, bias) {
-#    i <- seq(min(bias, na.rm=TRUE), max(bias, na.rm=TRUE), by = 0.001)
-#    coverage.trend <- loess(coverage ~ bias)
-#    coverage.model <- loess(predict(coverage.trend, i) ~ i)
-#    coverage.pred <- predict(coverage.model, bias)
-#    coverage.corrected <- coverage - coverage.pred + median(coverage)
-#}
-#
-#
-#filename <- file.path(outdir, paste0(outprefix, "_bin_100kb.rds"))
-#if(file.exists(filename)) q('no')
-#
-#load("./filters.hg19.rda")
-#load("./gaps.hg19.rda")
-#
-#ABurl <- getURL('https://raw.githubusercontent.com/Jfortin1/HiC_AB_Compartments/master/data/hic_compartments_100kb_ebv_2014.txt', ssl.verifyhost=FALSE, ssl.verifypeer=FALSE)
-#
-#AB <- read.table(textConnection(ABurl), header=TRUE)
-#AB <- makeGRangesFromDataFrame(AB, keep.extra.columns=TRUE)
-#
-#chromosomes <- GRanges(paste0("chr", 1:22),
-#                       IRanges(0, seqlengths(Hsapiens)[1:22]))
-#
-#tcmeres <- gaps.hg19[grepl("centromere|telomere", gaps.hg19$type)]
-#
-#arms <- GenomicRanges::setdiff(chromosomes, tcmeres)
-#arms <- arms[-c(25,27,29,41,43)]
-#
-#armlevels <- c("1p","1q","2p","2q","3p","3q","4p","4q","5p","5q","6p","6q",
-#               "7p","7q","8p","8q", "9p", "9q","10p","10q","11p","11q","12p",
-#               "12q","13q","14q","15q","16p","16q","17p","17q","18p","18q",
-#               "19p", "19q","20p","20q","21q","22q")
-#
-#arms$arm <- armlevels
-#AB <- AB[-queryHits(findOverlaps(AB, gaps.hg19))]
-#AB <- AB[queryHits(findOverlaps(AB, arms))]
-#AB$arm <- armlevels[subjectHits(findOverlaps(AB, arms))]
-#
-#seqinfo(AB) <- seqinfo(Hsapiens)[seqlevels(seqinfo(AB))]
-#AB <- trim(AB)
-#AB$gc <- GCcontent(Hsapiens, AB)
-#
-### These bins had no coverage
-#AB <- AB[-c(8780, 13665)]
-#fragments <- readRDS(frag.file)
-## 
-#### Filters
-#fragments <- fragments[-queryHits(findOverlaps(fragments, filters.hg19))]
-#w.all <- width(fragments)
-#
-#fragments <- fragments[which(w.all >= 100 & w.all <= 220)]
-#w <- width(fragments)
-#
-#frag.list <- split(fragments, w)
-#
-#counts <- sapply(frag.list, function(x) countOverlaps(AB, x))
-#if(min(w) > 100) {
-#    m0 <- matrix(0, ncol=min(w) - 100, nrow=nrow(counts),
-#                 dimnames=list(rownames(counts), 100:(min(w)-1)))
-#    counts <- cbind(m0, counts)
-#}
-#
-#olaps <- findOverlaps(fragments, AB)
-#bin.list <- split(fragments[queryHits(olaps)], subjectHits(olaps))
-#bingc <- rep(NA, length(bin.list))
-#bingc[unique(subjectHits(olaps))] <- sapply(bin.list, function(x) mean(x$gc))
-#
-#### Get modes
-#Mode <- function(x) {
-#    ux <- unique(x)
-#    ux[which.max(tabulate(match(x, ux)))]
-#}
-#modes <- Mode(w)
-#medians <- median(w)
-#q25 <- quantile(w, 0.25)
-#q75 <- quantile(w, 0.75)
-#
-#short <- rowSums(counts[,1:51])
-#long <- rowSums(counts[,52:121])
-#ratio <- short/long
-#ratio[is.na(ratio)] <- NA
-#ratio[is.infinite(ratio)] <- 0
-#short.corrected=gc.correct(short, bingc)
-#long.corrected=gc.correct(long, bingc)
-#nfrags.corrected=gc.correct(short+long, bingc)
-#ratio.corrected=gc.correct(ratio, bingc)
-#
-#AB$short <- short
-#AB$long <- long
-#AB$ratio <- short/long
-#AB$nfrags <- short+long
-#AB$short.corrected <- short.corrected
-#AB$long.corrected <- long.corrected
-#AB$nfrags.corrected <- nfrags.corrected
-#AB$ratio.corrected <- ratio.corrected
-#
-#AB$mode <- modes
-#AB$mean <- round(mean(w), 2)
-#AB$median <- medians
-#AB$quantile.25 <- q25
-#AB$quantile.75 <- q75
-#AB$frag.gc <- bingc
-#
-#for(i in 1:ncol(counts)) elementMetadata(AB)[,colnames(counts)[i]] <- counts[,i]
-#
-#saveRDS(AB, filename)
+gc.correct <- function(coverage, bias) {
+    i <- seq(min(bias, na.rm=TRUE), max(bias, na.rm=TRUE), by = 0.001)
+    coverage.trend <- loess(coverage ~ bias)
+    coverage.model <- loess(predict(coverage.trend, i) ~ i)
+    coverage.pred <- predict(coverage.model, bias)
+    coverage.corrected <- coverage - coverage.pred + median(coverage, na.rm=T)
+}
 
-# aggregate 100kb compartment for all samples
-files <- file.path(outdir, paste0(outprefix, "_bin_100kb.rds"))
 
-bins.list <- lapply(files, readRDS)
-tib.list <- lapply(bins.list, as_tibble)
-names(tib.list) <- outprefix
-tib.list <- map2(tib.list, names(tib.list), ~ mutate(.x, id = .y)) %>%
-    bind_rows() %>% dplyr::select(id, everything())
+filename <- file.path(outdir, paste0(outprefix, "_bin_100kb.rds"))
 
-tib.list <- tib.list %>% dplyr::select(-matches("X"))
-saveRDS(tib.list, file.path(outdir, "bins_100kbcompartments.rds"))
+load("./filters.hg19.rda")
+load("./gaps.hg19.rda")
 
-###########################################
-# 5. Combine 100kb bins to 5Mb bins       #
-###########################################
+ABurl <- getURL('https://raw.githubusercontent.com/Jfortin1/HiC_AB_Compartments/master/data/hic_compartments_100kb_ebv_2014.txt', ssl.verifyhost=FALSE, ssl.verifypeer=FALSE)
 
-df.fr <- readRDS("bins_100kbcompartments.rds")
-master <- read_csv("sample_reference.csv")
+AB <- read.table(textConnection(ABurl), header=TRUE)
+AB <- makeGRangesFromDataFrame(AB, keep.extra.columns=TRUE)
 
-df.fr2 <- inner_join(df.fr, master, by=c("id"="WGS ID"))
+chromosomes <- GRanges(paste0("chr", 1:22),
+                       IRanges(0, seqlengths(Hsapiens)[1:22]))
+
+tcmeres <- gaps.hg19[grepl("centromere|telomere", gaps.hg19$type)]
+
+arms <- GenomicRanges::setdiff(chromosomes, tcmeres)
+arms <- arms[-c(25,27,29,41,43)]
 
 armlevels <- c("1p","1q","2p","2q","3p","3q","4p","4q","5p","5q","6p","6q",
                "7p","7q","8p","8q", "9p", "9q","10p","10q","11p","11q","12p",
                "12q","13q","14q","15q","16p","16q","17p","17q","18p","18q",
                "19p", "19q","20p","20q","21q","22q")
-df.fr2$arm <- factor(df.fr2$arm, levels=armlevels)
 
-## combine adjacent 100kb bins to form 5mb bins. We count starting from
-## the telomeric end and remove the bin closest to the centromere if it is
-## smaller than 5mb.
-df.fr2 <- df.fr2 %>% group_by(id, arm) %>%
-    mutate(combine = ifelse(grepl("p", arm), ceiling((1:length(arm))/50),
-                           ceiling(rev((1:length(arm))/50) )))
+arms$arm <- armlevels
+AB <- AB[-queryHits(findOverlaps(AB, gaps.hg19))]
+AB <- AB[queryHits(findOverlaps(AB, arms))]
+AB$arm <- armlevels[subjectHits(findOverlaps(AB, arms))]
 
-df.fr3 <- df.fr2 %>% group_by(id, seqnames, arm, combine) %>%
-    summarize(short2=sum(short),
-              long2=sum(long),
-              short.corrected2=sum(short.corrected),
-              long.corrected2=sum(long.corrected),
-              hic.eigen=mean(eigen),
-              gc=mean(C.G),
-              ratio2=mean(ratio),
-              ratio.corrected2=mean(ratio.corrected),
-              nfrags2=sum(nfrags),
-              nfrags.corrected2=sum(nfrags.corrected),
-              domain = median(as.integer(domain)),
-              short.var=var(short.corrected),
-              long.var=var(long.corrected),
-              nfrags.var=var(nfrags.corrected),
-              mode_size=unique(mode),
-              mean_size=unique(mean),
-              median_size=unique(median),
-              q25_size=unique(quantile.25),
-              q75_size=unique(quantile.75),
-              start=start[1],
-              end=rev(end)[1],
-              binsize = n())
-### assign bins
-df.fr3 <- inner_join(df.fr3, master, by=c("sample"="WGS ID"))
-df.fr3 <- df.fr3 %>% mutate(type = gsub(" Cancer|carcinoma", "", `Patient Type`, ignore.case=TRUE))
+seqinfo(AB) <- seqinfo(Hsapiens)[seqlevels(seqinfo(AB))]
+AB <- trim(AB)
+AB$gc <- GCcontent(Hsapiens, AB)
 
-df.fr3 <- df.fr3 %>% filter(binsize==50)
-df.fr3 <- df.fr3 %>% group_by(sample) %>% mutate(bin = 1:length(sample))
+## These bins had no coverage
+#AB <- AB[-c(8780, 13665)]
+fragments <- readRDS(frag.file)
 
-saveRDS(df.fr3, "bins_5mbcompartments.rds")
+### Filters
+fragments <- fragments[-queryHits(findOverlaps(fragments, filters.hg19))]
+w.all <- width(fragments)
 
-###########################################
-# 6. summarize data for Gradient Boost    #
-###########################################
+fragments <- fragments[which(w.all >= 100 & w.all <= 220)]
+w <- width(fragments)
+
+frag.list <- split(fragments, w)
+
+counts <- sapply(frag.list, function(x) countOverlaps(AB, x))
+if(min(w) > 100) {
+    m0 <- matrix(0, ncol=min(w) - 100, nrow=nrow(counts),
+                 dimnames=list(rownames(counts), 100:(min(w)-1)))
+    counts <- cbind(m0, counts)
+}
+
+olaps <- findOverlaps(fragments, AB)
+bin.list <- split(fragments[queryHits(olaps)], subjectHits(olaps))
+bingc <- rep(NA, length(AB))
+bingc[unique(subjectHits(olaps))] <- sapply(bin.list, function(x) mean(x$gc))
+
+### Get modes
+Mode <- function(x) {
+    ux <- unique(x)
+    ux[which.max(tabulate(match(x, ux)))]
+}
+modes <- Mode(w)
+medians <- median(w)
+q25 <- quantile(w, 0.25)
+q75 <- quantile(w, 0.75)
+
+short <- rowSums(counts[,1:51])
+long <- rowSums(counts[,52:121])
+ratio <- short/long
+ratio[is.na(ratio)] <- NA
+ratio[is.infinite(ratio)] <- NA
+short.corrected=gc.correct(short, bingc)
+long.corrected=gc.correct(long, bingc)
+nfrags.corrected=gc.correct(short+long, bingc)
+ratio.corrected=gc.correct(ratio, bingc)
+
+AB$short <- short
+AB$long <- long
+AB$ratio <- ratio
+AB$nfrags <- short+long
+AB$short.corrected <- short.corrected
+AB$long.corrected <- long.corrected
+AB$nfrags.corrected <- nfrags.corrected
+AB$ratio.corrected <- ratio.corrected
+
+AB$mode <- modes
+AB$mean <- round(mean(w), 2)
+AB$median <- medians
+AB$quantile.25 <- q25
+AB$quantile.75 <- q75
+AB$frag.gc <- bingc
+
+for(i in 1:ncol(counts)) elementMetadata(AB)[,colnames(counts)[i]] <- counts[,i]
+
+saveRDS(AB, filename)
