@@ -48,6 +48,7 @@ library(GenomicRanges)
 library(multidplyr)
 library(readxl)
 library(caret)
+library(gbm)
 library(pROC)
 
 ###############################################
@@ -134,7 +135,6 @@ healthy.median <- df.fr3 %>%
               median.corrected.long=median(long.corrected2, na.rm=TRUE),
               median.corrected.ratio=median(ratio.corrected2, na.rm=TRUE),
               median.corrected.ratio2=median(short.corrected2/long.corrected2, na.rm=TRUE))
-
 summary.df <- df.fr3 %>% ungroup() %>% group_by(sample, type) %>%
     summarize(cov.cor=cor(nfrags2, healthy.median$median.cov, method="pearson", use="complete.obs"),
               short.cor=cor(short2, healthy.median$median.short, method="pearson", use="complete.obs"),
@@ -158,16 +158,16 @@ summary.df <- df.fr3 %>% ungroup() %>% group_by(sample, type) %>%
 summary.df <- inner_join(summary.df, master, by=c("sample"="WGS ID"))
 summary.df$`type` = relevel(as.factor(summary.df$`type`), "Healthy")
 
-saveRDS(summary.df, file.path(outdir, "summary_tibble.rds")
+saveRDS(summary.df, file.path(outdir, "summary_tibble.rds"))
 
-q()
+
 ##################################################################
 # 7. Prediction of tumore/healthy with Stochastic Gradient Boost #
 ##################################################################
 
 
-df.fr3 <- readRDS("../inst/extdata/bins_5mbcompartments.rds")
-summary.df <- readRDS("../inst/extdata/summary_tibble.rds")
+df.fr3 <- readRDS(file.path(outdir, "bins_5mbcompartments.rds"))
+summary.df <- readRDS(file.path(outdir, "summary_tibble.rds"))
 
 features.cov <- df.fr3  %>% ungroup() %>%
     select(nfrags.corrected2, sample, bin) %>%
@@ -188,7 +188,7 @@ features.short <- df.fr3  %>% ungroup() %>%
     as.data.frame()
 
 features.sl <- cbind(features.cov, features.short)
-colnames(features.sl) <- c(paste0("total", 1:498), paste0("short", 1:498))
+colnames(features.sl) <- c(paste0("total", 1:ncol(features.cov)), paste0("short", 1:ncol(features.short)))
 features.sl$type <- ifelse(summary.df$type == "Healthy", "Healthy", "Cancer")
 
 features <- cbind(features.sl,
@@ -243,7 +243,7 @@ model_z <- caret::train(type ~ .,
 
 #### Save
 models.list <- list("all"=model_gbm, "SL"=model_sl, "z"=model_z)
-saveRDS(models.list, "../inst/extdata/models_list.rds")
+saveRDS(models.list, file.path(outdir, "models_list.rds"))
 
 pred.tbl <- model_gbm$pred %>% filter(n.trees==150, interaction.depth==3) %>%
 group_by(rowIndex) %>% dplyr::summarize(obs=obs[1], Cancer=mean(Cancer))
@@ -267,5 +267,5 @@ pred.tbl <- pred.tbl %>%
 
 write.csv(inner_join(summary.df %>% select(-contains("Z Score")), pred.tbl %>%
                      select(rowIndex, sample, stage, Cancer, detected95, detected98),
-                     by=c("sample"="sample")),"../inst/extdata/predictions_gbm.csv",
+                     by=c("sample"="sample")), file.path(outdir, "predictions_gbm.csv"),
           row.names=FALSE)
