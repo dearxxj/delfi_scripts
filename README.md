@@ -1,6 +1,8 @@
 # DELFI (DNA Evaluation of Fragments for early Interception)
 Detection of abnormalities in cell-free DNA (cfDNA) by genome-wide analysis of fragmentation patterns based on low-coverage Whole Genome Sequencing of isolated cfDNA.
+
 For more details, please refer to Cristiano et al. 2019 [ref](https://www.nature.com/articles/s41586-019-1272-6)
+
 Forked from [https://github.com/cancer-genomics/delfi_scripts](https://github.com/cancer-genomics/delfi_scripts)
 
 -------------------------------------------------------------------------------------
@@ -22,6 +24,7 @@ This script generate a genome-wide fragment profile at 100kb bins from a bam fil
 Here, I down-sampled a WGS for K562 (Leukemia) cell line to 2X coverage, and generated 100kb-binned fragment profile as cancer sample. Fragment profile for healthy control was obtained from a WGS for NA12878 (lymphocyte) downsampled to 2X coverage.
 
 WGS for K562 was downloaded from [https://www.encodeproject.org/experiments/ENCSR045NDZ/](https://www.encodeproject.org/experiments/ENCSR045NDZ/)
+
 WGS for NA12878 was downloaded from SRA (accession number: ERR3239334)
 
 
