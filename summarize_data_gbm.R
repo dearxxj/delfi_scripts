@@ -26,7 +26,7 @@ options.names <- sapply(listoptions, function(x) {
 names(options.args) <- unlist(options.names)
 
 usage <- function() {
-	message('Usage: Rscript --vanilla summarize_data_gbm.R --bindir <bin dir> --sample <sample_reference.csv> --outdir <output dir>')
+	message('Usage: Rscript --vanilla summarize_data_gbm.R --bindir <100kb bin directory> --sample <sample_reference.csv> --outdir <output directory>')
 }
 if (length(options.names) != 3) {
 	usage()

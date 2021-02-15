@@ -25,21 +25,22 @@ options.names <- sapply(listoptions, function(x) {
 names(options.args) <- unlist(options.names)
 
 usage <- function() {
-	message('Usage: Rscript --vanilla delfi_WGS.R --bam <bam> --out <out_prefix>')
+	message('Usage: Rscript --vanilla delfi_WGS.R --bam <bam> --out_prefix <output_prefix> --out_dir <output_directory>')
 }
 if (length(options.names) != 2) {
 	usage()
 	stop('Required options missing!')
 }
 for (op in options.names) {
-	if (!(op %in% c('bam', 'out'))) {
+	if (!(op %in% c('bam', 'out_prefix', 'out_dir'))) {
 		usage()
 		stop(paste0('Unrecognized option --', op))
 	}
 }
 
 bamfile <- options.args['bam']
-outprefix <- options.args['out']
+outprefix <- options.args['out_prefix']
+outdir <- options.args['out_dir']
 
 
 library(BSgenome.Hsapiens.UCSC.hg19)
@@ -57,31 +58,33 @@ library(multidplyr)
 
 
 
-############################################
-## 1. Get hg19 gaps & blacklisted regions  #
-############################################
-#
-#genome <- "hg19"
-#mySession <- browserSession()
-#genome(mySession) <- genome
-#gaps <- getTable(ucscTableQuery(mySession, track="gap"))
-#gaps.hg19 <- GRanges(gaps$chrom, IRanges(gaps$chromStart,
-#					 gaps$chromEnd), type=gaps$type)
-#gaps.hg19 <- keepSeqlevels(gaps.hg19, paste0("chr", c(1:22, "X", "Y")),
-#                           pruning.mode="coarse")
-#hsapiens <- BSgenome.Hsapiens.UCSC.hg19::Hsapiens
-#seqinfo(gaps.hg19) <- seqinfo(hsapiens)[seqlevels(gaps.hg19),]
-#
-#blacklisted.file <- httr::content(GET("http://hgdownload.cse.ucsc.edu/goldenpath/hg19/encodeDCC/wgEncodeMapability/wgEncodeDukeMapabilityRegionsExcludable.bed.gz"))
-#blacklisted.tib <- read_tsv(gzcon(rawConnection(blacklisted.file)),
-#							col_names=c("seqnames", "start",
-#							"end", "name", "score"))
-#blacklisted.tib <- blacklisted.tib %>% mutate(start=start+1)
-#filters.hg19 <- makeGRangesFromDataFrame(blacklisted.tib,
-#                                           keep.extra.columns=TRUE)
-#filters.hg19 <- keepSeqlevels(filters.hg19, paste0("chr", c(1:22, "X", "Y")),
-#							   pruning.mode="coarse")
-#seqinfo(filters.hg19) <- seqinfo(Hsapiens)[seqlevels(filters.hg19),]
+###########################################
+# 1. Get hg19 gaps & blacklisted regions  #
+###########################################
+
+genome <- "hg19"
+mySession <- browserSession()
+genome(mySession) <- genome
+gaps <- getTable(ucscTableQuery(mySession, track="gap"))
+gaps.hg19 <- GRanges(gaps$chrom, IRanges(gaps$chromStart,
+					 gaps$chromEnd), type=gaps$type)
+gaps.hg19 <- keepSeqlevels(gaps.hg19, paste0("chr", c(1:22, "X", "Y")),
+                           pruning.mode="coarse")
+hsapiens <- BSgenome.Hsapiens.UCSC.hg19::Hsapiens
+seqinfo(gaps.hg19) <- seqinfo(hsapiens)[seqlevels(gaps.hg19),]
+save(gaps.hg19, file=file.path(outdir, "gaps.hg19.rda"))
+
+blacklisted.file <- httr::content(GET("http://hgdownload.cse.ucsc.edu/goldenpath/hg19/encodeDCC/wgEncodeMapability/wgEncodeDukeMapabilityRegionsExcludable.bed.gz"))
+blacklisted.tib <- read_tsv(gzcon(rawConnection(blacklisted.file)),
+							col_names=c("seqnames", "start",
+							"end", "name", "score"))
+blacklisted.tib <- blacklisted.tib %>% mutate(start=start+1)
+filters.hg19 <- makeGRangesFromDataFrame(blacklisted.tib,
+                                           keep.extra.columns=TRUE)
+filters.hg19 <- keepSeqlevels(filters.hg19, paste0("chr", c(1:22, "X", "Y")),
+							   pruning.mode="coarse")
+seqinfo(filters.hg19) <- seqinfo(Hsapiens)[seqlevels(filters.hg19),]
+save(filters.hg19, file=file.path(outdir, "filters.hg19.rda"))
 
 
 ###########################################
@@ -96,7 +99,6 @@ param <- ScanBamParam(flag = scanBamFlag(isDuplicate = FALSE,
                                          isSecondaryAlignment = FALSE,
                                          isUnmappedQuery = FALSE),
                       mapqFilter = 30)
-outdir <- '../'
 galp.file <- file.path(outdir, paste0(outprefix, ".rds"))
 galp <- readGAlignmentPairs(bamfile, param = param)
 saveRDS(galp, galp.file)
