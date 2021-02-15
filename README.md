@@ -59,10 +59,10 @@ Output:
 
 #### Plot of fragment profile for artificial samples from K562 and NA12878
 
-![frag_plot](result/fragment_profile.pdf)
+![frag_plot](result/fragment_profile.png)
 
 Note: The healthy NA12878 shows higher variance of fragment profile probably due to smaller short/long read count. Although WGS of both K562 and NA12878 were down-sampled to 2X genome coverage, and have read length of 150-bp. The fragment length maybe different due to different library construction and experimental protocals.
 
 #### ROC of Delfi predictions on distinguishing cancer versus healthy individuals
 
-![ROC_plot](result/prediction_ROC.pdf)
+![ROC_plot](result/prediction_ROC.png)
