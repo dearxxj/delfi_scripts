@@ -1,5 +1,5 @@
-# Random sample fragment counts 100 time for tumor and control
-# to generate 100 tumor fragment profile and 100 healthy fragment profile
+# Random sample fragment profile for tumor and control
+# to generate sample-size matched tumor fragment profiles and healthy fragment profiles as in the paper
 require(tidyverse)
 require(GenomicRanges)
 
