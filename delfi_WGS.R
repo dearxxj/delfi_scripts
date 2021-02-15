@@ -27,7 +27,7 @@ names(options.args) <- unlist(options.names)
 usage <- function() {
 	message('Usage: Rscript --vanilla delfi_WGS.R --bam <bam> --out_prefix <output_prefix> --out_dir <output_directory>')
 }
-if (length(options.names) != 2) {
+if (length(options.names) != 3) {
 	usage()
 	stop('Required options missing!')
 }
@@ -137,8 +137,8 @@ gc.correct <- function(coverage, bias) {
 
 filename <- file.path(outdir, paste0(outprefix, "_bin_100kb.rds"))
 
-load("./filters.hg19.rda")
-load("./gaps.hg19.rda")
+load(file.path(outdir, "filters.hg19.rda"))
+load(file.path(outdir, "gaps.hg19.rda"))
 
 ABurl <- getURL('https://raw.githubusercontent.com/Jfortin1/HiC_AB_Compartments/master/data/hic_compartments_100kb_ebv_2014.txt', ssl.verifyhost=FALSE, ssl.verifypeer=FALSE)
 

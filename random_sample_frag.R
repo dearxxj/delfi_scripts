@@ -3,8 +3,8 @@
 require(tidyverse)
 require(GenomicRanges)
 
-AB_cancer <- readRDS('../K562_bin_100kb.rds')
-AB_healthy <- readRDS('../NA12878_bin_100kb.rds')
+AB_cancer <- readRDS('result/K562_bin_100kb.rds')
+AB_healthy <- readRDS('result/NA12878_bin_100kb.rds')
 
 outdir <- "../random_100kb"
 dir.create(outdir, showWarnings=F)
